@@ -1,0 +1,8 @@
+# backend/requirements.txt
+fastapi
+uvicorn
+supabase
+pydantic
+pydantic-settings
+email-validator
+python-dotenv
