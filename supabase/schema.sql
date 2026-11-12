@@ -215,13 +215,13 @@ create table if not exists public.knowledge_embeddings (
   handover_item_id uuid references public.handover_items(id) on delete cascade,
   source_document_id uuid references public.source_documents(id) on delete cascade,
   content text not null,
-  embedding vector(1536) not null,
+  embedding vector(384) not null,
   source_url text not null,
   required_clearance smallint not null default 1 check (required_clearance between 1 and 5),
   is_approved boolean not null default false,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
-  check (handover_item_id is not null)
+  check (handover_item_id is not null or source_document_id is not null)
 );
 
 create table if not exists public.audit_logs (

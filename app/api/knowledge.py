@@ -1,9 +1,14 @@
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.security import require_team_member, require_team_roles
+from app.connectors.github import GitHubConnector
+from app.core.config import settings
 from app.db.supabase_client import get_supabase_client
+from app.models.connectors import GitHubSyncRequest
+from app.services.embeddings import EmbeddingService, chunk_text
 from app.models.schema import (
     DecisionCreate,
     DecisionUpdate,
@@ -25,6 +30,122 @@ def _raise_if_empty(data, detail: str):
     if not data:
         raise HTTPException(status_code=404, detail=detail)
     return data[0] if isinstance(data, list) else data
+
+
+@router.post("/sources/{source_id}/vectorize")
+def vectorize_source(
+    team_id: UUID,
+    source_id: UUID,
+    member=Depends(require_team_roles("ADMIN", "LEAD")),
+):
+    """Create clearance-filtered, searchable chunks for one source document."""
+    client = _client_for(member)
+    source_result = (
+        client.table("source_documents")
+        .select("id, source_url, title, content, metadata")
+        .eq("id", str(source_id))
+        .eq("team_id", str(team_id))
+        .maybe_single()
+        .execute()
+    )
+    source = source_result.data
+    if not source:
+        raise HTTPException(status_code=404, detail="Source document not found.")
+    if not source.get("content"):
+        raise HTTPException(
+            status_code=422,
+            detail="Source document has no content to vectorize.",
+        )
+
+    chunks = chunk_text(source["content"])
+    try:
+        vectors = EmbeddingService(
+        ).embed(chunks)
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail="Embedding provider failed while vectorizing the source.",
+        ) from error
+
+    client.table("knowledge_embeddings").delete().eq(
+        "team_id", str(team_id)
+    ).eq("source_document_id", str(source_id)).execute()
+
+    rows = [
+        {
+            "team_id": str(team_id),
+            "source_document_id": str(source_id),
+            "content": chunk.content,
+            "embedding": vector,
+            "source_url": source["source_url"],
+            "required_clearance": 1,
+            "is_approved": False,
+            "metadata": {
+                **(source.get("metadata") or {}),
+                "source_title": source.get("title"),
+                "chunk_index": chunk.index,
+                "embedding_model": settings.EMBEDDING_MODEL,
+                "embedding_dimension": len(vector),
+            },
+        }
+        for chunk, vector in zip(chunks, vectors)
+    ]
+    if rows:
+        client.table("knowledge_embeddings").insert(rows).execute()
+
+    return {
+        "source_document_id": str(source_id),
+        "chunks_created": len(rows),
+        "embedding_model": settings.EMBEDDING_MODEL,
+        "approved": False,
+    }
+
+
+@router.post("/sources/github/sync")
+def sync_github(
+    team_id: UUID,
+    payload: GitHubSyncRequest,
+    member=Depends(require_team_roles("ADMIN", "LEAD")),
+):
+    """Fetch GitHub pull requests and upsert them as raw source documents."""
+    try:
+        documents = GitHubConnector(token=settings.GITHUB_TOKEN).fetch(
+            repository=payload.repository,
+            state=payload.state,
+            limit=payload.limit,
+        )
+    except httpx.HTTPStatusError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub API returned HTTP {error.response.status_code}.",
+        ) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status_code=502,
+            detail="GitHub could not be reached.",
+        ) from error
+
+    client = _client_for(member)
+    stored = []
+    for document in documents:
+        result = client.table("source_documents").upsert({
+            "team_id": str(team_id),
+            "source_platform": "GITHUB",
+            "source_id": document["source_id"],
+            "source_url": document["source_url"],
+            "title": document["title"],
+            "content": document["content"],
+            "metadata": document["metadata"],
+            "ingested_by": member["user_id"],
+        }, on_conflict="team_id,source_platform,source_id").execute()
+        stored.extend(result.data or [])
+
+    return {
+        "repository": payload.repository,
+        "fetched": len(documents),
+        "stored": len(stored),
+        "documents": stored,
+    }
 
 
 @router.post("/sources", status_code=status.HTTP_201_CREATED)

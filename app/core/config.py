@@ -4,6 +4,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Knowledge Handover API"
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
+    GITHUB_TOKEN: str | None = None
+    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
 
     class Config:
         env_file = ".env"

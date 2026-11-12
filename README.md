@@ -14,9 +14,8 @@ The schema provides:
 - `pgvector` embeddings restricted to approved content
 - Row Level Security for team membership, roles, and clearance
 
-The script enables `pgcrypto` and `vector`. The embedding column is currently
-`vector(1536)`; change that dimension if the selected embedding model uses a
-different output size.
+The script enables `pgcrypto` and `vector`. The embedding column is currently `vector(384)` for the local
+`BAAI/bge-small-en-v1.5` model through FastEmbed.
 
 When a signed-in user creates a team, a database trigger automatically creates
 that user as an `ADMIN` team member with clearance level 5.
@@ -100,3 +99,59 @@ token and team membership.
 The source endpoint is the connector boundary: GitHub/Jira adapters should
 write raw data there first, then the LangChain extraction worker should create
 tasks and decisions with the returned `source_document_id`.
+
+### GitHub connector
+
+GitHub pull requests can be synchronized into `source_documents` with:
+
+```http
+POST /teams/{team_id}/sources/github/sync
+Authorization: Bearer <admin_or_lead_access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "repository": "owner/repository",
+  "state": "open",
+  "limit": 20
+}
+```
+
+Set `GITHUB_TOKEN` in the backend `.env` for private repositories or higher
+rate limits. Never send that token from the frontend. The connector stores the
+pull request description and issue comments as one traceable GitHub source
+document; LangChain processing can consume those documents afterward.
+
+## Vectorization
+
+Before vectorizing source documents, run
+[`supabase/fix_source_embeddings.sql`](./supabase/fix_source_embeddings.sql)
+against an existing database. It allows embeddings to reference a
+`source_document_id` before a handover item exists.
+
+The MVP uses a local embedding model, so no OpenAI key is required. Configure
+the backend optionally:
+
+```env
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+```
+
+Then call:
+
+```http
+POST /teams/{team_id}/sources/{source_id}/vectorize
+Authorization: Bearer <admin_or_lead_access_token>
+```
+
+The endpoint normalizes and chunks the source content, creates
+384-dimensional FastEmbed embeddings, deletes older chunks for that source, and
+stores the replacements in `knowledge_embeddings`. New vectors are
+`is_approved = false`; they are not visible to the RAG search policy until a
+reviewed handover approves them.
+
+For an existing database, run
+[`supabase/migrate_local_embeddings.sql`](./supabase/migrate_local_embeddings.sql)
+before vectorizing. It removes only derived vectors and changes the pgvector
+column from 1536 to 384 dimensions. Source documents remain intact and can be
+embedded again.
