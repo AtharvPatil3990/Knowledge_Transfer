@@ -55,7 +55,7 @@ class TeamMemberCreate(TeamMemberBase):
 class TaskBase(BaseModel):
     source_platform: PlatformSource
     source_id: str = Field(..., description="The original ID from the source platform (e.g., PR-42 or JIRA-101).")
-    source_url: str = Field(..., description="The direct URL to the task for 100% traceability.")
+    source_url: str = Field(..., min_length=1, description="The direct URL to the task for 100% traceability.")
     title: str
     status: TaskStatus
     description: Optional[str] = None
@@ -65,7 +65,40 @@ class DecisionBase(BaseModel):
     summary: str = Field(..., description="A concise summary of the architectural trade-off or blocker.")
     confidence_score: Optional[float] = Field(None, description="AI confidence score for the extracted decision.")
     is_uncertain: bool = Field(default=False, description="Flagged true if conflicting information is found in the sources.")
-    source_url: str = Field(..., description="The URL of the chat thread or PR comment where the decision was made.")
+    source_url: str = Field(..., min_length=1, description="The URL of the chat thread or PR comment where the decision was made.")
+
+class SourceDocumentCreate(BaseModel):
+    source_platform: PlatformSource
+    source_id: str = Field(min_length=1)
+    source_url: str
+    title: Optional[str] = None
+    content: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+
+class TaskCreate(TaskBase):
+    source_document_id: Optional[UUID] = None
+    priority: Optional[int] = Field(default=None, ge=1, le=5)
+    due_at: Optional[datetime] = None
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[TaskStatus] = None
+    description: Optional[str] = None
+    priority: Optional[int] = Field(default=None, ge=1, le=5)
+    due_at: Optional[datetime] = None
+
+class DecisionCreate(DecisionBase):
+    source_document_id: Optional[UUID] = None
+    rationale: Optional[str] = None
+    uncertainty_reason: Optional[str] = None
+
+class DecisionUpdate(BaseModel):
+    decision_type: Optional[DecisionCategory] = None
+    summary: Optional[str] = Field(default=None, min_length=1)
+    rationale: Optional[str] = None
+    confidence_score: Optional[float] = Field(default=None, ge=0, le=1)
+    is_uncertain: Optional[bool] = None
+    uncertainty_reason: Optional[str] = None
 
 # ------------------------------------------------------------------------
 # 3. Extraction Schemas (Specifically for LangChain Output Parsers)

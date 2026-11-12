@@ -76,3 +76,27 @@ If team creation returns `new row violates row-level security policy for table
 in the Supabase SQL Editor. The API creates teams through the authenticated
 `create_team` RPC, which assigns ownership from `auth.uid()` and lets the
 database trigger create the initial `ADMIN` member atomically.
+
+## Knowledge endpoints
+
+The ingestion and normalized knowledge endpoints are implemented in
+[`app/api/knowledge.py`](./app/api/knowledge.py). All routes require a bearer
+token and team membership.
+
+- `POST /teams/{team_id}/sources` — store or update a raw source document;
+  requires `ADMIN` or `LEAD`
+- `GET /teams/{team_id}/sources` — list source documents
+- `POST /teams/{team_id}/tasks` — create a normalized task
+- `GET /teams/{team_id}/tasks` — list tasks, optionally filtered by `status`
+- `GET /teams/{team_id}/tasks/{task_id}` — get a task
+- `PATCH /teams/{team_id}/tasks/{task_id}` — update a task
+- `DELETE /teams/{team_id}/tasks/{task_id}` — delete a task
+- `POST /teams/{team_id}/decisions` — create a normalized decision
+- `GET /teams/{team_id}/decisions` — list decisions
+- `GET /teams/{team_id}/decisions/{decision_id}` — get a decision
+- `PATCH /teams/{team_id}/decisions/{decision_id}` — update a decision
+- `DELETE /teams/{team_id}/decisions/{decision_id}` — delete a decision
+
+The source endpoint is the connector boundary: GitHub/Jira adapters should
+write raw data there first, then the LangChain extraction worker should create
+tasks and decisions with the returned `source_document_id`.
