@@ -5,12 +5,14 @@ from app.core.config import settings
 from app.db.supabase_client import supabase_client
 from app.api.auth import router as auth_router
 from app.api.github import router as github_router
+from app.api.routes_chat import router as chat_router
 from app.api.teams import router as teams_router
 from app.api.knowledge import router as knowledge_router
 
 app = FastAPI(title=settings.PROJECT_NAME)
 app.include_router(auth_router)
 app.include_router(github_router)
+app.include_router(chat_router)
 app.include_router(teams_router)
 app.include_router(knowledge_router)
 

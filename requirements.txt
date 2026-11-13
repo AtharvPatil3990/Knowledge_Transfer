@@ -9,3 +9,6 @@ python-dotenv
 httpx
 fastembed
 langchain-community
+langchain
+langchain-classic
+langchain-groq
