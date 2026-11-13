@@ -52,6 +52,10 @@ class TeamMemberBase(BaseModel):
 class TeamMemberCreate(TeamMemberBase):
     auth_user_id: UUID
 
+class GitHubTokenExchangeRequest(BaseModel):
+    code: str = Field(..., min_length=1)
+    team_id: UUID
+
 class TaskBase(BaseModel):
     source_platform: PlatformSource
     source_id: str = Field(..., description="The original ID from the source platform (e.g., PR-42 or JIRA-101).")

@@ -123,6 +123,29 @@ rate limits. Never send that token from the frontend. The connector stores the
 pull request description and issue comments as one traceable GitHub source
 document; LangChain processing can consume those documents afterward.
 
+To complete the GitHub OAuth flow, add the OAuth application's credentials to
+the backend `.env`:
+
+```env
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+```
+
+Then send the temporary authorization code to
+`POST /github/exchange` with an authenticated `ADMIN` or `LEAD` bearer token:
+
+```json
+{
+  "code": "temporary_github_code",
+  "team_id": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+The endpoint exchanges the code and stores the returned token in
+`public.teams.github_access_token`. Supabase protects the database connection
+with encryption at rest; do not expose this column through public API
+responses.
+
 ## Vectorization
 
 Before vectorizing source documents, run

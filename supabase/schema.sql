@@ -62,10 +62,14 @@ create table if not exists public.teams (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(trim(name)) > 0),
   description text,
+  github_access_token text,
   created_by uuid not null references auth.users(id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.teams
+  add column if not exists github_access_token text;
 
 create table if not exists public.team_members (
   id uuid primary key default gen_random_uuid(),
