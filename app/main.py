@@ -20,12 +20,12 @@ app.include_router(knowledge_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-            "http://localhost:5173", 
-            "http://localhost:3000",
-            "https://digital-handover-1.vercel.app/login",
-            "https://digital-handover-1-git-main-alphasquad4.vercel.app",
-            "https://digital-handover-1-cbll4j8x3-alphasquad4.vercel.app"
-            
+            # "http://localhost:5173", 
+            # "http://localhost:3000",
+            # "https://digital-handover-1.vercel.app/login",
+            # "https://digital-handover-1-git-main-alphasquad4.vercel.app",
+            # "https://digital-handover-1-cbll4j8x3-alphasquad4.vercel.app",
+            "*"
     ], 
     allow_credentials=True,
     allow_methods=["*"],
